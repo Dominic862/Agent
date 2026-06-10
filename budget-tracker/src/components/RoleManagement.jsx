@@ -11,7 +11,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ReferenceLine,
 } from 'recharts'
 
 const COLORS = [
@@ -195,7 +194,7 @@ function AvailabilityGrid({ role }) {
   )
 }
 
-const CustomTooltip = ({ active, payload, label, currency }) => {
+const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-3 text-xs">

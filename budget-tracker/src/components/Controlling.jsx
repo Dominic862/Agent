@@ -5,7 +5,6 @@ import { useStore } from '../store'
 import {
   ComposedChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -93,7 +92,7 @@ function KPICard({ label, value, sub, color = 'indigo', trend }) {
 }
 
 function ActualHoursTable() {
-  const { roles, getMonths, actualHours, setActualHours, project } = useStore()
+  const { roles, getMonths, actualHours, setActualHours } = useStore()
   const months = getMonths()
   const [editCell, setEditCell] = useState(null)
 
@@ -176,7 +175,6 @@ export default function Controlling({ onBack }) {
     actualHours,
     getTotalActualCost,
     getTotalPlannedCost,
-    getMonthlyCapacity,
     project,
   } = useStore()
 
@@ -185,27 +183,24 @@ export default function Controlling({ onBack }) {
 
   // ─── Aggregate data ────────────────────────────────────────────
   const totalBudget = project.totalBudget
-  let cumulativeBudget = 0
-  let cumulativeActual = 0
 
-  const chartData = months.map((m) => {
+  const chartData = months.reduce((acc, m) => {
     const budget = monthlyBudgets[m] || 0
     const planned = getTotalPlannedCost(m)
     const actual = getTotalActualCost(m)
     const isFuture = isAfter(parseISO(m + '-01'), new Date())
+    const prev = acc[acc.length - 1]
 
-    cumulativeBudget += budget
-    if (!isFuture) cumulativeActual += actual
-
-    return {
+    acc.push({
       month: monthLabel(m),
       Budget: budget,
       Geplant: Math.round(planned),
       Effektiv: isFuture ? null : Math.round(actual),
-      cumBudget: cumulativeBudget,
-      cumActual: isFuture ? null : cumulativeActual,
-    }
-  })
+      cumBudget: (prev?.cumBudget ?? 0) + budget,
+      cumActual: isFuture ? null : (prev?.cumActual ?? 0) + actual,
+    })
+    return acc
+  }, [])
 
   const totalActualToDate = months
     .filter((m) => !isAfter(parseISO(m + '-01'), new Date()))
@@ -216,7 +211,6 @@ export default function Controlling({ onBack }) {
     .reduce((s, m) => s + (monthlyBudgets[m] || 0), 0)
 
   const budgetConsumedPct = totalBudget > 0 ? (totalActualToDate / totalBudget) * 100 : 0
-  const burnRatePct = totalBudgetToDate > 0 ? (totalActualToDate / totalBudgetToDate) * 100 : 0
   const remaining = totalBudget - totalActualToDate
 
   const pastMonths = months.filter((m) => !isAfter(parseISO(m + '-01'), new Date()))
@@ -247,7 +241,8 @@ export default function Controlling({ onBack }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `budget-report-${project.name || 'projekt'}.csv`
+    const safeName = (project.name || 'projekt').replace(/[^\p{L}\p{N}\s_-]/gu, '').trim() || 'projekt'
+    a.download = `budget-report-${safeName}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }

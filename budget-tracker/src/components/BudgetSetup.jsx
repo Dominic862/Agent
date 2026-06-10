@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { format, addMonths, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { de } from 'date-fns/locale'
 import { useStore } from '../store'
 
@@ -11,15 +10,9 @@ const fmt = (val) =>
 export default function BudgetSetup({ onNext }) {
   const { project, setProject, monthlyBudgets, setMonthlyBudget, distributeEvenly, getMonths } =
     useStore()
-  const [distributeMode, setDistributeMode] = useState('manual')
 
   const months = getMonths()
   const totalMonthly = months.reduce((s, m) => s + (monthlyBudgets[m] || 0), 0)
-
-  const handleDistribute = () => {
-    distributeEvenly()
-    setDistributeMode('even')
-  }
 
   const monthLabel = (m) => {
     try {
@@ -114,7 +107,7 @@ export default function BudgetSetup({ onNext }) {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={handleDistribute}
+                onClick={distributeEvenly}
                 className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-indigo-100 transition-colors"
               >
                 Gleichmässig verteilen
@@ -179,10 +172,7 @@ export default function BudgetSetup({ onNext }) {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 pr-8"
                       value={val || ''}
                       placeholder="0"
-                      onChange={(e) => {
-                        setMonthlyBudget(m, e.target.value)
-                        setDistributeMode('manual')
-                      }}
+                      onChange={(e) => setMonthlyBudget(m, e.target.value)}
                     />
                     {pct > 0 && (
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
