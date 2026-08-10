@@ -4,9 +4,11 @@ Model-driven Power App auf Dataverse, um als Team Leiter im Consulting den Über
 
 Diese App wird in Power Apps Studio (make.powerapps.com) gebaut, nicht als Git-Code. Dieses Dokument ist die Spezifikation/Referenz, die du beim Bauen abarbeitest — jeder Abschnitt ist copy-paste-fähig für die Tabellen-/Spaltennamen und die Power Apps Copilot-Prompts.
 
+**Ziel-Environment:** `https://make.powerapps.com/environments/e7521bca-3922-e988-b5ef-24eb94ac0b14/home`
+
 ## 0. Solution & Publisher
 
-1. make.powerapps.com → Environment wählen → **Solutions** → **New solution**
+1. make.powerapps.com → obige Environment (`e7521bca-3922-e988-b5ef-24eb94ac0b14`) auswählen → **Solutions** → **New solution**
 2. Solution-Name: `Team Lead Cockpit`
 3. Publisher: neuen Publisher anlegen, z. B. Name `Team Lead Cockpit Publisher`, **Prefix**: `tlc`
 4. Nicht in der Default-Solution arbeiten — alle folgenden Tabellen/Objekte innerhalb dieser Solution anlegen.
@@ -159,10 +161,11 @@ Nach dem Zusammenstellen: **Speichern & Veröffentlichen**.
 ## 7. Optional — ALM/Source Control (Phase 3)
 
 ```
-pac auth create --environment <deine-environment-url>
+pac auth create --environment https://make.powerapps.com/environments/e7521bca-3922-e988-b5ef-24eb94ac0b14/home
 pac solution export --name TeamLeadCockpit --path ./export --managed false
 pac solution unpack --zipfile ./export/TeamLeadCockpit.zip --folder ./solutions/TeamLeadCockpit --packagetype Unmanaged
 ```
+(`pac auth create` läuft interaktiv mit deinem Microsoft-Login auf deiner eigenen Maschine, nicht in dieser Claude-Code-Session — hier gibt es keinen Zugriff auf deinen Tenant.)
 Ergebnis in diesem Repo unter `solutions/TeamLeadCockpit/` versionieren.
 
 ## Verifikation (End-to-End-Test)
