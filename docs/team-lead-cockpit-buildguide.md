@@ -4,14 +4,16 @@ Model-driven Power App auf Dataverse, um als Team Leiter im Consulting den Über
 
 Diese App wird in Power Apps Studio (make.powerapps.com) gebaut, nicht als Git-Code. Dieses Dokument ist die Spezifikation/Referenz, die du beim Bauen abarbeitest — jeder Abschnitt ist copy-paste-fähig für die Tabellen-/Spaltennamen und die Power Apps Copilot-Prompts.
 
-**Ziel-Environment:** `https://make.powerapps.com/environments/e7521bca-3922-e988-b5ef-24eb94ac0b14/home`
+**Ziel-Environment:** `https://make.powerapps.com/environments/13d81629-1580-efa4-8815-5b503fdfbb4d/home`
+**Solution:** `https://make.powerapps.com/environments/13d81629-1580-efa4-8815-5b503fdfbb4d/solutions/528705b1-ae94-f111-8075-7c1e52fb87aa`
 
 ## 0. Solution & Publisher
 
-1. make.powerapps.com → obige Environment (`e7521bca-3922-e988-b5ef-24eb94ac0b14`) auswählen → **Solutions** → **New solution**
+1. make.powerapps.com → obige Environment (`13d81629-1580-efa4-8815-5b503fdfbb4d`) auswählen → **Solutions** → **New solution**
 2. Solution-Name: `Team Lead Cockpit`
 3. Publisher: neuen Publisher anlegen, z. B. Name `Team Lead Cockpit Publisher`, **Prefix**: `tlc`
 4. Nicht in der Default-Solution arbeiten — alle folgenden Tabellen/Objekte innerhalb dieser Solution anlegen.
+5. ✅ Solution angelegt — weiter mit Abschnitt 1 (Tabellen)
 
 ## 1. Tabellen
 
