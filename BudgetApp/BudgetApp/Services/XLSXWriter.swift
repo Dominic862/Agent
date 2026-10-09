@@ -12,6 +12,9 @@ enum XLSXWriter {
         case percent(Double)
         case date(Date)
         case month(Date)
+        case bold(String)
+        /// Formel ohne führendes «=», mit vorberechnetem Wert für Vorschauen ohne Neuberechnung
+        case formula(String, cached: Double, bold: Bool = false)
     }
 
     struct Sheet {
@@ -88,24 +91,27 @@ enum XLSXWriter {
         return s + "</Relationships>"
     }
 
-    /// Stil-Indizes: 0 Standard, 1 Kopfzeile, 2 Datum, 3 Währung, 4 Prozent, 5 Monat
+    /// Stil-Indizes: 0 Standard, 1 Kopfzeile, 2 Datum, 3 Währung, 4 Prozent, 5 Monat, 6 fett, 7 Währung fett
     private static let styles = header + #"""
     <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\#
     <numFmts count="4"><numFmt numFmtId="164" formatCode="dd.mm.yyyy"/><numFmt numFmtId="165" formatCode="#,##0.00"/>\#
     <numFmt numFmtId="166" formatCode="0.0%"/><numFmt numFmtId="167" formatCode="mmmm yyyy"/></numFmts>\#
-    <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>\#
-    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>\#
+    <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font>\#
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>\#
+    <font><b/><sz val="11"/><name val="Calibri"/></font></fonts>\#
     <fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>\#
     <fill><patternFill patternType="solid"><fgColor rgb="FF2F5597"/><bgColor indexed="64"/></patternFill></fill></fills>\#
     <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>\#
     <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>\#
-    <cellXfs count="6">\#
+    <cellXfs count="8">\#
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>\#
     <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>\#
     <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>\#
     <xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>\#
     <xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>\#
     <xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>\#
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>\#
+    <xf numFmtId="165" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>\#
     </cellXfs>\#
     <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>\#
     </styleSheet>
@@ -149,6 +155,10 @@ enum XLSXWriter {
         case .percent(let v): return number(v, style: 4)
         case .date(let d): return number(ExcelDate.serial(from: d), style: 2)
         case .month(let d): return number(ExcelDate.serial(from: d), style: 5)
+        case .bold(let t): return inline(t, style: 6)
+        case .formula(let f, let cached, let bold):
+            let value = cached.isFinite ? "<v>\(cached)</v>" : ""
+            return #"<c r="\#(ref)" s="\#(bold ? 7 : 3)"><f>\#(escape(f))</f>\#(value)</c>"#
         }
     }
 

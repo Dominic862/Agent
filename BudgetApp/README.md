@@ -1,25 +1,27 @@
 # Budget – iOS-App mit Excel-Anbindung
 
-SwiftUI-App (iOS 17+) zum Verwalten deines Budgets. Daten kommen aus einem Excel, werden in der App gespeichert und lassen sich jederzeit wieder als Excel sichern.
+SwiftUI-App (iOS 17+) zum Verwalten deines Budgets. Grundlage ist das Budget-Excel mit einem Jahresplan pro Blatt (Posten × Monate). Die App liest es ein, zeigt ein Dashboard, macht Verbesserungsvorschläge und speichert alles wieder als Excel im selben Format.
 
 ## Funktionen
 
 | Tab | Inhalt |
 |---|---|
-| **Übersicht** | Dashboard pro Monat: Einnahmen, Ausgaben, Saldo, Sparquote, Donut-Chart nach Kategorie, Budget-Fortschritt, 6-Monats-Verlauf, Top-Tipps |
-| **Buchungen** | Liste nach Monaten, Suche, Filter, Erfassen/Bearbeiten/Löschen (Wischen) |
-| **Budgets** | Monatsbudget pro Kategorie mit Fortschrittsbalken; Vorschläge aus deinem Ø der letzten 3 Monate |
-| **Tipps** | Verbesserungsvorschläge mit geschätztem Sparpotenzial |
-| **Excel** | Import (.xlsx / .csv), Export & Teilen, leere Vorlage, Auto-Backup, Währung, Beispieldaten |
+| **Übersicht** | Monat aus dem Jahresplan: Einnahmen, Ausgaben, Überschuss, Sparquote · Überschuss-Balken für alle 12 Monate · Ausgaben nach Kategorie · Aufteilung nach 50/30/20 · Soll/Ist, sobald Buchungen erfasst sind |
+| **Plan** | Dein Excel als Liste: Posten nach Kategorie, Monats- oder Jahresansicht, Posten bearbeiten (gleicher Betrag pro Monat, Von–Bis, Jahresrechnung ÷ Monate oder jeder Monat einzeln), Varianten wie «2026 (2)», Kopie fürs nächste Jahr |
+| **Buchungen** | Optionale Ist-Erfassung (manuell oder Bank-Export als CSV) |
+| **Tipps** | Verbesserungsvorschläge mit geschätztem Potenzial |
+| **Excel** | Import, Export & Teilen, Vorlage, Auto-Backup, Währung, Beispieldaten |
 
-### Verbesserungsvorschläge (Tipps)
-- Budget überschritten bzw. **auf Kurs zur Überschreitung** (Hochrechnung mit Tagesbetrag für den Rest des Monats)
-- Sparquote nach der **50/30/20-Regel** (Defizit-Warnung, Lücke zum 20-%-Ziel)
-- Kategorien deutlich **über dem Durchschnitt** der Vormonate
-- Erkennung **wiederkehrender Zahlungen/Abos** mit Jahreskosten
-- **Kleinbeträge**, die sich summieren (z. B. Kaffee)
-- Wohnkosten > ⅓ des Einkommens, eine Kategorie dominiert die Ausgaben
-- Fehlende Budgets mit konkretem Vorschlag
+### Verbesserungsvorschläge
+Aus dem Jahresplan:
+- Monate mit **Defizit** und **zu wenig Puffer** (Überschuss unter 3 % des Einkommens) mit Vorschlägen aus den flexiblen Posten
+- **Sparquote** (Sparen, Säule 3a/3b, Sparkonten, Rückstellungen) gegenüber 15–20 %
+- **Krankenkasse** über 10 % des Einkommens (Franchise, Modell, Prämienverbilligung, Kündigung bis 30.11.)
+- **Wohnkosten** über ⅓, **Telefon/Internet/Medien** über 150 pro Monat, **Fixkosten** über 65 %
+- **Vergleich mit dem Vorjahresplan**: grösste Mehrkosten, tiefer budgetierte Steuern
+- Hinweis auf ein separates **Rückstellungskonto** für jährliche Rechnungen
+
+Aus den Buchungen (falls erfasst): Kategorien über Plan, Hochrechnung bis Monatsende, Abos/wiederkehrende Zahlungen, Kleinbeträge.
 
 ### Speichern
 - Alle Daten werden lokal mit **SwiftData** gespeichert.
@@ -28,18 +30,27 @@ SwiftUI-App (iOS 17+) zum Verwalten deines Budgets. Daten kommen aus einem Excel
 
 ## Excel-Format
 
-Siehe [`Vorlage/Budget-Vorlage.xlsx`](Vorlage/Budget-Vorlage.xlsx).
+Die App liest das Format des bestehenden Budget-Excels (siehe [`Vorlage/Budget-Vorlage.xlsx`](Vorlage/Budget-Vorlage.xlsx)):
 
-**Blatt «Transaktionen»**
+**Ein Blatt pro Jahr** (Blattname = Jahr, z. B. `2026` oder `2026 (2)`):
 
-| Datum | Beschreibung | Kategorie | Typ | Betrag | Notiz |
-|---|---|---|---|---|---|
-| 01.10.2026 | Miete | Wohnen | Ausgabe | 1850.00 | |
-| 25.10.2026 | Lohn | Lohn | Einnahme | 6400.00 | |
+| | Budget | Kategorie *(optional)* | Januar | … | Dezember | pro Jahr |
+|---|---|---|---|---|---|---|
+| | Wohnungsmiete | | 1950 | … | 1950 | =SUMME |
+| | Krankenkasse Partner | | 480 | … | 480 | =SUMME |
+| | *Total-Zeile* | | | | | |
+| | Lohn | | 7800 | … | 7800 | |
+| | Kinderzulage | | 215 | … | 215 | |
+| | Überschuss/Negativ? | | | | | |
 
-**Blatt «Budgets»**: `Kategorie | Monatsbudget`
+- Erkannt wird die Kopfzeile mit den Monaten Januar–Dezember; die Posten stehen links davon.
+- Alles nach der Total-Zeile bis «Überschuss» gilt als Einnahme. Blöcke weiter unten (z. B. «Einnahmen»/«Ausgaben» zur Ist-Erfassung) werden ignoriert.
+- Formeln wie `=1126/12` werden mit ihrem berechneten Wert übernommen.
+- Die Summe wird mit der Total-Zeile des Excels abgeglichen. Fehlt dort ein Posten (z. B. eine Sparrate, die über ein anderes Konto läuft), lässt die App ihn ebenfalls weg und meldet das.
+- Kategorien werden automatisch vergeben (z. B. «KK Kind» → Krankenkasse, «Säule 3b» → Sparen & Vorsorge) und sind pro Posten änderbar.
+- Ein Blatt **«Transaktionen»** (Datum, Beschreibung, Kategorie, Typ, Betrag) wird als Ist-Buchungen gelesen; Bank-Exporte als CSV ebenso.
 
-Der Import ist tolerant: Spaltennamen werden auch auf Englisch oder in Bank-Varianten erkannt (`Date`, `Buchungstext`, `Amount`, `Soll/Haben`, `Belastung/Gutschrift` …), Beträge wie `1'234.50`, `1.234,50` oder `-12.00`, Datumsangaben als Excel-Datum oder Text. Ohne Typ-Spalte gelten negative Beträge als Ausgaben. Beim Import wählst du «Hinzufügen» (Duplikate werden übersprungen) oder «Ersetzen».
+Der Export schreibt dasselbe Layout mit Summenformeln für Jahr, Total und Überschuss – du kannst also im Excel weiterarbeiten und wieder importieren («Hinzufügen / aktualisieren» ersetzt Pläne mit gleichem Namen).
 
 ## Projekt öffnen
 
@@ -54,7 +65,7 @@ open BudgetApp.xcodeproj
 
 Dann in Xcode unter *Signing & Capabilities* dein Team wählen und auf dem iPhone oder im Simulator starten. Abhängigkeit: [ZIPFoundation](https://github.com/weichsel/ZIPFoundation) (wird automatisch per Swift Package Manager geladen) – zum Lesen/Schreiben der .xlsx-Container.
 
-Zum Ausprobieren: Tab **Excel › Beispieldaten laden**.
+Zum Ausprobieren: Tab **Excel › Excel / CSV importieren** und das eigene Budget-Excel wählen – oder **Beispieldaten laden**.
 
 ## Struktur
 
@@ -65,14 +76,14 @@ BudgetApp/
 ├── Vorlage/Budget-Vorlage.xlsx Excel-Vorlage
 └── BudgetApp/
     ├── BudgetApp.swift         App-Einstieg, SwiftData-Container
-    ├── Models/                 Booking, CategoryBudget, Kategorien-Icons/Farben, Formatierung
+    ├── Models/                 BudgetPlan/PlanItem (Soll), Booking (Ist), Kategorien-Regeln, Formatierung
     ├── Services/
     │   ├── XLSXReader.swift    .xlsx- und CSV-Leser
     │   ├── XLSXWriter.swift    .xlsx-Schreiber (Formate, fixierte Kopfzeile)
-    │   ├── BudgetImporter.swift Spaltenerkennung & Werte-Parsing
-    │   ├── BudgetExporter.swift Export + Auto-Backup
-    │   ├── Analytics.swift     Monatssummen, Trends, Abo-Erkennung, Budgetvorschläge
+    │   ├── BudgetImporter.swift Jahresplan- und Buchungs-Erkennung
+    │   ├── BudgetExporter.swift Export im Plan-Layout + Auto-Backup
+    │   ├── Analytics.swift     Monatssummen, Trends, Abo-Erkennung
     │   ├── InsightEngine.swift Verbesserungsvorschläge
     │   └── SampleData.swift    Beispieldaten
-    └── Views/                  Dashboard, Buchungen, Budgets, Tipps, Excel
+    └── Views/                  Übersicht, Plan, Buchungen, Tipps, Excel
 ```

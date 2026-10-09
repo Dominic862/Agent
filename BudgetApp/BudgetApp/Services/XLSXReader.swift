@@ -10,7 +10,7 @@ enum XLSXError: LocalizedError {
         switch self {
         case .invalidFile: "Die Datei konnte nicht als Excel-Arbeitsmappe (.xlsx) gelesen werden."
         case .noData: "Die Datei enthält keine Daten."
-        case .noTransactions: "Keine Tabelle mit Datum- und Betrag-Spalte gefunden. Verwende die Spalten «Datum», «Beschreibung», «Kategorie», «Typ» und «Betrag» (siehe Vorlage)."
+        case .noTransactions: "Weder ein Jahresplan (Posten als Zeilen, Monate Januar–Dezember als Spalten) noch eine Buchungsliste (Spalten Datum und Betrag) gefunden."
         }
     }
 }

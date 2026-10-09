@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-/// Eine Einnahme oder Ausgabe. `amount` ist immer positiv, die Richtung steht in `isIncome`.
+/// Eine tatsächliche Einnahme oder Ausgabe (Ist). `amount` ist immer positiv, die Richtung steht in `isIncome`.
 @Model
 final class Booking {
     var date: Date = Date()
@@ -21,16 +21,4 @@ final class Booking {
     }
 
     var signedAmount: Double { isIncome ? amount : -amount }
-}
-
-/// Monatsbudget für eine Ausgabenkategorie.
-@Model
-final class CategoryBudget {
-    var category: String = ""
-    var monthlyLimit: Double = 0
-
-    init(category: String, monthlyLimit: Double) {
-        self.category = category
-        self.monthlyLimit = monthlyLimit
-    }
 }

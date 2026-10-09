@@ -9,21 +9,39 @@ struct ParsedBooking {
     var note: String
 }
 
+struct ParsedPlan {
+    var name: String
+    var year: Int
+    var items: [ParsedPlanItem]
+}
+
+struct ParsedPlanItem {
+    var title: String
+    var category: String
+    var isIncome: Bool
+    var amounts: [Double]
+}
+
 struct ImportResult {
+    var plans: [ParsedPlan]
     var bookings: [ParsedBooking]
-    var budgets: [(category: String, limit: Double)]
     var skippedRows: Int
-    var sheetName: String
+    var notes: [String]
 
     var summary: String {
-        var parts = ["\(bookings.count) Buchungen aus «\(sheetName)»"]
-        if !budgets.isEmpty { parts.append("\(budgets.count) Budgets") }
+        var parts: [String] = []
+        if !plans.isEmpty {
+            parts.append("\(plans.count) Jahrespläne (\(plans.map(\.name).joined(separator: ", ")))")
+        }
+        if !bookings.isEmpty { parts.append("\(bookings.count) Buchungen") }
         if skippedRows > 0 { parts.append("\(skippedRows) Zeilen übersprungen") }
         return parts.joined(separator: ", ")
     }
 }
 
-/// Erkennt in einer beliebigen Excel- oder CSV-Tabelle die Spalten für Datum, Betrag usw.
+/// Liest zwei Excel-Formate:
+/// 1. Jahresplan: Posten als Zeilen, Monate (Januar–Dezember) als Spalten, darunter Total, Einnahmen und Überschuss.
+/// 2. Buchungsliste: Spalten wie Datum, Beschreibung, Kategorie, Typ, Betrag (auch Bank-Exporte als CSV).
 enum BudgetImporter {
     private static let dateKeys = ["datum", "date", "tag", "buchungsdatum", "valuta", "valutadatum"]
     private static let titleKeys = ["beschreibung", "description", "titel", "title", "text", "buchungstext",
@@ -34,7 +52,6 @@ enum BudgetImporter {
     private static let incomeKeys = ["einnahme", "einnahmen", "income", "gutschrift", "haben", "credit", "eingang"]
     private static let expenseKeys = ["ausgabe", "ausgaben", "expense", "expenses", "belastung", "soll", "debit", "lastschrift"]
     private static let noteKeys = ["notiz", "note", "notes", "bemerkung", "kommentar", "comment"]
-    private static let budgetKeys = ["monatsbudget", "budget", "limit", "betrag", "amount", "planbetrag", "plan"]
     private static let incomeCategoryHints = ["lohn", "gehalt", "salar", "einkommen", "salary", "income", "einnahme", "bonus"]
 
     static func importFile(at url: URL) throws -> ImportResult {
@@ -44,19 +61,154 @@ enum BudgetImporter {
             : try XLSXReader.read(url: url)
         guard sheets.contains(where: { !$0.rows.isEmpty }) else { throw XLSXError.noData }
 
-        var best: (sheet: Worksheet, bookings: [ParsedBooking], skipped: Int)?
-        var budgets: [(String, Double)] = []
-
+        var result = ImportResult(plans: [], bookings: [], skippedRows: 0, notes: [])
         for sheet in sheets {
-            if let parsed = parseTransactions(sheet), parsed.bookings.count > (best?.bookings.count ?? -1) {
-                best = (sheet, parsed.bookings, parsed.skipped)
-            } else if budgets.isEmpty, let parsedBudgets = parseBudgets(sheet) {
-                budgets = parsedBudgets
+            if let plan = parsePlan(sheet, notes: &result.notes) {
+                result.plans.append(plan)
+            } else if let parsed = parseTransactions(sheet) {
+                result.bookings += parsed.bookings
+                result.skippedRows += parsed.skipped
             }
         }
-        guard let best else { throw XLSXError.noTransactions }
-        return ImportResult(bookings: best.bookings, budgets: budgets.map { (category: $0.0, limit: $0.1) },
-                            skippedRows: best.skipped, sheetName: best.sheet.name)
+        guard !result.plans.isEmpty || !result.bookings.isEmpty else { throw XLSXError.noTransactions }
+        return result
+    }
+
+    // MARK: - Jahresplan
+
+    private static let monthKeys = ["januar", "februar", "marz", "april", "mai", "juni",
+                                    "juli", "august", "september", "oktober", "november", "dezember"]
+    private static let englishMonthKeys = ["january", "february", "march", "april", "may", "june",
+                                           "july", "august", "september", "october", "november", "december"]
+
+    /// "Januar", "Jan", "Jan." oder "January" → 0
+    static func monthIndex(_ text: String) -> Int? {
+        let n = normalize(text)
+        guard n.count >= 3, n.allSatisfy(\.isLetter) else { return nil }
+        for keys in [monthKeys, englishMonthKeys] {
+            if let i = keys.firstIndex(of: n) { return i }
+        }
+        for keys in [monthKeys, englishMonthKeys] {
+            if let i = keys.firstIndex(where: { $0.hasPrefix(n) }) { return i }
+        }
+        if n == "mrz" || n == "maerz" { return 2 }
+        return nil
+    }
+
+    private static func monthColumns(_ row: [CellValue]) -> [Int: Int] {
+        var columns: [Int: Int] = [:]
+        for (column, cell) in row.enumerated() {
+            guard case .text(let text) = cell, let month = monthIndex(text), columns[month] == nil else { continue }
+            columns[month] = column
+        }
+        return columns
+    }
+
+    private static func parsePlan(_ sheet: Worksheet, notes: inout [String]) -> ParsedPlan? {
+        guard let headerIndex = sheet.rows.prefix(30).firstIndex(where: { monthColumns($0).count == 12 }) else { return nil }
+        let header = sheet.rows[headerIndex]
+        let columnsByMonth = monthColumns(header)
+        let months = (0..<12).compactMap { columnsByMonth[$0] }
+        let firstMonth = months.min() ?? 0
+        let categoryColumn = header.prefix(firstMonth).firstIndex { normalize($0.string).hasPrefix("kategorie") }
+
+        func label(_ row: [CellValue]) -> String {
+            for column in 0..<min(firstMonth, row.count) where column != categoryColumn {
+                if case .text(let t) = row[column], !t.trimmingCharacters(in: .whitespaces).isEmpty {
+                    return t.trimmingCharacters(in: .whitespaces)
+                }
+            }
+            return ""
+        }
+        func values(_ row: [CellValue]) -> [Double] {
+            months.map { column in
+                guard row.indices.contains(column), case .number(let n) = row[column] else { return 0 }
+                return n
+            }
+        }
+        func hasMonthNames(_ row: [CellValue]) -> Bool { monthColumns(row).count >= 6 }
+
+        var items: [ParsedPlanItem] = []
+        var inIncome = false
+        var sheetTotals: [Double]?
+        for row in sheet.rows.dropFirst(headerIndex + 1) {
+            if hasMonthNames(row) {
+                if inIncome { break }      // nächster Block (z. B. Ist-Erfassung) beginnt
+                inIncome = true
+                continue
+            }
+            let title = label(row)
+            let v = values(row)
+            let key = normalize(title)
+            if title.isEmpty {
+                if v.contains(where: { $0 != 0 }) {
+                    if !inIncome {
+                        inIncome = true
+                        sheetTotals = v
+                    } else if sheetTotals == nil {
+                        sheetTotals = v
+                    }
+                }
+                continue
+            }
+            if key.hasPrefix("uberschuss") || key.hasPrefix("saldo") || key.hasPrefix("differenz") { break }
+            if key.hasPrefix("total") || key.hasPrefix("summe") {
+                if !inIncome { inIncome = true; sheetTotals = v }
+                continue
+            }
+            // Überschriften ohne Beträge und Hilfszeilen wie «Rückstellungen pro Monat …» überspringen
+            if key.contains("promonat") || !v.contains(where: { $0 != 0 }) { continue }
+
+            var category = ""
+            if let c = categoryColumn, row.indices.contains(c) { category = row[c].string }
+            if category.isEmpty { category = CategoryStyle.autoCategory(for: title, isIncome: inIncome) }
+            items.append(ParsedPlanItem(title: title, category: category, isIncome: inIncome, amounts: v))
+        }
+
+        let expenses = items.filter { !$0.isIncome }
+        guard expenses.count >= 2 else { return nil }
+
+        // Abgleich mit der Total-Zeile im Excel: Ist ein Posten dort nicht mitgezählt, wird er weggelassen.
+        if let totals = sheetTotals {
+            let ours = (0..<12).map { m in expenses.reduce(0) { $0 + $1.amounts[m] } }
+            let checked = (0..<12).filter { totals[$0] != 0 }
+            let diff = checked.map { ours[$0] - totals[$0] }
+            if diff.contains(where: { abs($0) > 0.05 }) {
+                if let excluded = items.firstIndex(where: { item in
+                    !item.isIncome && zip(checked, diff).allSatisfy { pair in abs(item.amounts[pair.0] - pair.1) < 0.05 }
+                }) {
+                    notes.append("«\(sheet.name)»: «\(items[excluded].title)» ist in der Excel-Summe nicht enthalten und wurde weggelassen.")
+                    items.remove(at: excluded)
+                } else if let maxDiff = diff.map(abs).max() {
+                    notes.append("«\(sheet.name)»: Die Summe weicht um bis zu \(String(format: "%.2f", maxDiff)) von der Total-Zeile im Excel ab.")
+                }
+            }
+        }
+        if !items.contains(where: \.isIncome) {
+            notes.append("«\(sheet.name)»: Keine Einnahmen gefunden – ergänze sie in der App.")
+        }
+
+        return ParsedPlan(name: sheet.name, year: year(in: sheet.name) ?? year(inHeader: header, before: firstMonth) ?? 0,
+                          items: items)
+    }
+
+    /// "2026 (2)" → 2026
+    static func year(in text: String) -> Int? {
+        var digits = ""
+        for ch in text + " " {
+            if ch.isNumber { digits.append(ch); continue }
+            if digits.count == 4, let y = Int(digits), (2000...2100).contains(y) { return y }
+            digits = ""
+        }
+        return nil
+    }
+
+    private static func year(inHeader header: [CellValue], before column: Int) -> Int? {
+        for cell in header.prefix(column) {
+            if case .number(let n) = cell, (2000...2100).contains(Int(n)) { return Int(n) }
+            if case .text(let t) = cell, let y = year(in: t) { return y }
+        }
+        return nil
     }
 
     // MARK: - Tabellen
@@ -153,24 +305,6 @@ enum BudgetImporter {
                                  note: raw.note)
         }
         return (bookings, skipped)
-    }
-
-    private static func parseBudgets(_ sheet: Worksheet) -> [(String, Double)]? {
-        for (headerIndex, row) in sheet.rows.prefix(10).enumerated() {
-            let headers = row.map { normalize($0.string) }
-            guard column(headers, dateKeys) == nil,
-                  let cat = column(headers, categoryKeys),
-                  let limit = column(headers, budgetKeys), limit != cat else { continue }
-            var result: [(String, Double)] = []
-            for row in sheet.rows.dropFirst(headerIndex + 1) {
-                guard row.indices.contains(cat), row.indices.contains(limit) else { continue }
-                let name = row[cat].string
-                guard !name.isEmpty, let value = parseAmount(row[limit]), value > 0 else { continue }
-                result.append((name, value))
-            }
-            return result.isEmpty ? nil : result
-        }
-        return nil
     }
 
     // MARK: - Werte
