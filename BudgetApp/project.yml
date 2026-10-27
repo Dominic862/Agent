@@ -19,6 +19,7 @@ targets:
     platform: iOS
     sources:
       - BudgetApp
+    scheme: {}
     dependencies:
       - package: ZIPFoundation
     settings:

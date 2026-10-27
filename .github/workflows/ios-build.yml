@@ -1,0 +1,58 @@
+name: iOS Build
+
+# Baut die Budget-App auf einem macOS-Runner (kein eigener Mac nötig)
+# und stellt eine unsignierte BudgetApp.ipa als Artefakt bereit.
+# Die .ipa lässt sich unter Windows mit Sideloadly + Apple-ID aufs iPhone installieren.
+on:
+  push:
+    paths:
+      - "BudgetApp/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+
+      - name: Xcode-Projekt erzeugen
+        working-directory: BudgetApp
+        run: xcodegen generate
+
+      - name: App bauen (ohne Signatur)
+        working-directory: BudgetApp
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project BudgetApp.xcodeproj \
+            -scheme BudgetApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee xcodebuild.log | grep -E "error:|warning: .*BudgetApp/|BUILD (SUCCEEDED|FAILED)" || true
+          grep -q "BUILD SUCCEEDED" xcodebuild.log
+
+      - name: IPA verpacken
+        working-directory: BudgetApp
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/BudgetApp.app Payload/
+          zip -qr BudgetApp.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BudgetApp-ipa
+          path: BudgetApp/BudgetApp.ipa
+          retention-days: 30
+
+      - name: Build-Log bei Fehler
+        if: failure()
+        working-directory: BudgetApp
+        run: grep -E "error:" -A3 xcodebuild.log | head -100 || true
